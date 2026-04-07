@@ -105,6 +105,8 @@ export class MessageRenderer {
     if (!isStreaming) this._setupCopyBtn(div);
     this.container.appendChild(div);
     if (!isHistory) this.scrollToBottom();
+    // Render any mermaid diagrams in this message
+    if (!isStreaming && window.renderMermaidDiagrams) window.renderMermaidDiagrams();
 
     return div;
   }
@@ -179,6 +181,8 @@ export class MessageRenderer {
       }
       html += renderMarkdown(rawText);
       contentDiv.innerHTML = html;
+      // Render any mermaid diagrams after streaming finishes
+      if (window.renderMermaidDiagrams) window.renderMermaidDiagrams();
     }
 
     // Add copy button after streaming finishes

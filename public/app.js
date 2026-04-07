@@ -249,9 +249,6 @@ function handleRPCEvent(event) {
         if (activeItem) activeItem.textContent = event.name;
       }
       break;
-    case 'team_event':
-      handleTeamEvent(event);
-      break;
   }
 }
 
@@ -259,14 +256,80 @@ function handleRPCEvent(event) {
 // Multi-team worker/lead event rendering
 // ═══════════════════════════════════════
 
+// Track active card IDs per agent — when "done", clear so next event creates a new card
+const _teamCardActive = {};
+let _teamCardSeq = 0;
+
+/**
+ * Extract the most relevant input text from a tool call for display.
+ * For bash: show the command. For read/grep: show the path/pattern.
+ */
+function extractToolInput(toolName, args) {
+  if (!args) return null;
+  switch (toolName) {
+    case 'bash':
+      return args.command || args.cmd || null;
+    case 'read':
+      return args.file_path || args.path || null;
+    case 'grep':
+    case 'Grep':
+      return args.pattern ? `grep: ${args.pattern}${args.path ? ` in ${args.path}` : ''}` : null;
+    case 'find':
+      return args.path || args.pattern || null;
+    case 'write':
+    case 'edit':
+      return args.file_path || args.path || null;
+    default:
+      // For unknown tools, try common arg names
+      return args.command || args.query || args.file_path || args.path || null;
+  }
+}
+
+/**
+ * Create a tool input block with copy button.
+ */
+function createToolInputBlock(text) {
+  const el = document.createElement('div');
+  el.className = 'team-tool-input';
+  el.innerHTML = `<pre><code>${escapeHtmlInline(text)}</code></pre><button class="team-tool-copy" title="Copy command" aria-label="Copy command"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>`;
+  const btn = el.querySelector('.team-tool-copy');
+  btn.addEventListener('click', () => {
+    const copyText = (t) => {
+      if (navigator.clipboard) return navigator.clipboard.writeText(t);
+      const ta = document.createElement('textarea');
+      ta.value = t;
+      ta.style.cssText = 'position:fixed;left:-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      return Promise.resolve();
+    };
+    copyText(text).then(() => {
+      btn.classList.add('copied');
+      btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => {
+        btn.classList.remove('copied');
+        btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+      }, 1500);
+    });
+  });
+  return el;
+}
+
 function handleTeamEvent(event) {
   const { agent, team, role, update, event: rawEvent } = event;
 
-  // Find or create the team activity card (reuses tool-card styling)
-  const agentId = `team-agent-${(agent || 'unknown').replace(/\s+/g, '-').toLowerCase()}`;
-  let card = document.getElementById(agentId);
+  const agentKey = (agent || 'unknown').replace(/\s+/g, '-').toLowerCase();
+
+  // If agent's current card is done, force a new one
+  let agentId = _teamCardActive[agentKey];
+  let card = agentId ? document.getElementById(agentId) : null;
 
   if (!card) {
+    _teamCardSeq++;
+    agentId = `team-agent-${agentKey}-${_teamCardSeq}`;
+    _teamCardActive[agentKey] = agentId;
     card = document.createElement('div');
     card.id = agentId;
     card.className = 'tool-card';
@@ -299,6 +362,10 @@ function handleTeamEvent(event) {
     tools.className = 'team-tools-row';
     body.appendChild(tools);
 
+    const toolInputs = document.createElement('div');
+    toolInputs.className = 'team-tool-inputs';
+    body.appendChild(toolInputs);
+
     const output = document.createElement('div');
     output.className = 'tool-output';
     body.appendChild(output);
@@ -313,6 +380,7 @@ function handleTeamEvent(event) {
 
   const body = card.querySelector('.tool-card-body');
   const toolsRow = body.querySelector('.team-tools-row');
+  const toolInputs = body.querySelector('.team-tool-inputs');
   const output = body.querySelector('.tool-output');
   const statsEl = body.querySelector('.team-card-stats');
 
@@ -325,6 +393,14 @@ function handleTeamEvent(event) {
       badge.className = 'team-tool-inline';
       badge.textContent = update.blocked ? `❌ ${update.toolName}` : `⚙ ${update.toolName}`;
       toolsRow.appendChild(badge);
+      // Show tool input (SQL commands, file paths, etc.) as proof of work
+      if (update.toolInput && !update.blocked) {
+        const inputText = extractToolInput(update.toolName, update.toolInput);
+        if (inputText) {
+          toolInputs.appendChild(createToolInputBlock(inputText));
+        }
+      }
+      messageRenderer.scrollToBottom();
     } else if (update.type === 'stats') {
       statsEl.textContent = `$${(update.cost || 0).toFixed(4)} · ${update.tokensIn || 0}in → ${update.tokensOut || 0}out`;
     } else if (update.type === 'done') {
@@ -334,6 +410,8 @@ function handleTeamEvent(event) {
       body.classList.remove('expanded');
       const chevron = card.querySelector('.tool-card-chevron');
       if (chevron) chevron.classList.remove('expanded');
+      // Clear active card so next event for this agent creates a new card
+      delete _teamCardActive[agentKey];
     }
   } else if (rawEvent) {
     if (rawEvent.type === 'tool_execution_start' && rawEvent.toolName) {
@@ -341,11 +419,27 @@ function handleTeamEvent(event) {
       badge.className = 'team-tool-inline';
       badge.textContent = `⚙ ${rawEvent.toolName}`;
       toolsRow.appendChild(badge);
-    } else if (rawEvent.type === 'message_update' && rawEvent.assistantMessageEvent?.type === 'text_delta') {
-      const delta = rawEvent.assistantMessageEvent.delta || rawEvent.assistantMessageEvent.text || '';
-      output.textContent += delta;
-      messageRenderer.scrollToBottom();
+      // Show tool input for lead's own tool calls
+      if (rawEvent.args) {
+        const inputText = extractToolInput(rawEvent.toolName, rawEvent.args);
+        if (inputText) {
+          toolInputs.appendChild(createToolInputBlock(inputText));
+        }
+      }
+    } else if (rawEvent.type === 'message_update' && rawEvent.assistantMessageEvent) {
+      const ame = rawEvent.assistantMessageEvent;
+      if (ame.type === 'text_delta') {
+        const delta = ame.delta || ame.text || '';
+        output.textContent += delta;
+      }
+    } else if (rawEvent.type === 'tool_execution_end' && rawEvent.toolName) {
+      // Mark tool complete in badges
+      const badge = document.createElement('span');
+      badge.className = 'team-tool-inline';
+      badge.textContent = `✓ ${rawEvent.toolName}`;
+      toolsRow.appendChild(badge);
     }
+    messageRenderer.scrollToBottom();
   }
 }
 
@@ -380,9 +474,9 @@ function handleCompactionEnd(event) {
 function handleAgentStart() {
   state.setStreaming(true);
   showTypingIndicator(true);
-  // Clear previous team activity container for fresh turn
-  const teamActivity = document.getElementById('team-activity');
-  if (teamActivity) teamActivity.remove();
+  // Reset team card tracking for fresh turn
+  Object.keys(_teamCardActive).forEach(k => delete _teamCardActive[k]);
+  _teamCardSeq = 0;
   updateUI();
 }
 
@@ -488,6 +582,21 @@ function handleToolExecutionStart(event) {
 
 function handleToolExecutionUpdate(event) {
   const { toolCallId, partialResult } = event;
+
+  // Detect team_event wrapped in Pi tool update format: { content: [{ type: "text", text: JSON }] }
+  if (partialResult && partialResult.content && Array.isArray(partialResult.content)) {
+    const textBlock = partialResult.content.find(b => b.type === 'text' && b.text);
+    if (textBlock) {
+      try {
+        const parsed = JSON.parse(textBlock.text);
+        if (parsed && parsed.type === 'team_event') {
+          handleTeamEvent(parsed);
+          return;
+        }
+      } catch { /* not JSON — fall through to standard handling */ }
+    }
+  }
+
   const output = formatToolOutput(partialResult);
 
   state.updateToolExecution(toolCallId, {

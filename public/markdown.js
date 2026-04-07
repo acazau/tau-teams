@@ -34,6 +34,20 @@ export function renderMarkdown(text) {
       if (inList) { html += `</${listType}>`; inList = false; }
       if (inBlockquote) { html += '</blockquote>'; inBlockquote = false; }
       const block = codeBlocks[parseInt(codeMatch[1])];
+      // Mermaid diagrams get rendered as interactive SVG with share toolbar
+      if (block.lang === 'mermaid') {
+        const mermaidId = 'mermaid-src-' + (window._mermaidSourceCounter = (window._mermaidSourceCounter || 0) + 1);
+        // Store raw source in a global map — avoids data-attribute escaping issues
+        window._mermaidSources = window._mermaidSources || {};
+        window._mermaidSources[mermaidId] = block.code;
+        html += `<div class="mermaid-wrapper">`;
+        html += `<div class="mermaid-toolbar">`;
+        html += `<button class="mermaid-btn" onclick="copyMermaidSource('${mermaidId}')" title="Copy Mermaid source"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy</button>`;
+        html += `<button class="mermaid-btn" onclick="openMermaidLive('${mermaidId}')" title="Open in mermaid.live"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg> Share</button>`;
+        html += `</div>`;
+        html += `<div class="mermaid">${escapeHtml(block.code)}</div></div>`;
+        continue;
+      }
       const langLabel = block.lang || 'code';
       html += `<div class="code-block-wrapper">`;
       html += `<div class="code-block-header"><span>${escapeHtml(langLabel)}</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>`;
@@ -152,6 +166,55 @@ function escapeHtml(text) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
+
+// Global copy Mermaid source — accepts a source ID key
+window.copyMermaidSource = function(idOrBtn) {
+  const source = window._mermaidSources?.[idOrBtn] || '';
+  if (!source) return;
+  const btn = document.querySelector(`[onclick*="${idOrBtn}"]`);
+  const doCopy = (t) => {
+    if (navigator.clipboard) return navigator.clipboard.writeText(t);
+    const ta = document.createElement('textarea');
+    ta.value = t;
+    ta.style.cssText = 'position:fixed;left:-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    return Promise.resolve();
+  };
+  doCopy(source).then(() => {
+    if (!btn) return;
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.innerHTML = orig; btn.classList.remove('copied'); }, 1500);
+  });
+};
+
+// Global open in mermaid.live — accepts a source ID key
+window.openMermaidLive = function(id) {
+  const source = window._mermaidSources?.[id] || '';
+  if (!source) return;
+  try {
+    const state = { code: source, mermaid: { theme: 'dark' } };
+    const json = JSON.stringify(state);
+    const compressed = window.pako.deflate(new TextEncoder().encode(json));
+    // Convert Uint8Array to base64 safely (handles large diagrams)
+    let binary = '';
+    for (let i = 0; i < compressed.length; i++) {
+      binary += String.fromCharCode(compressed[i]);
+    }
+    const base64 = btoa(binary);
+    const url = 'https://mermaid.live/edit#pako:' + base64;
+    window.open(url, '_blank');
+  } catch (e) {
+    console.error('Failed to encode mermaid.live URL:', e);
+    // Fallback: copy source and open mermaid.live empty
+    window.copyMermaidSource(id);
+    window.open('https://mermaid.live/edit', '_blank');
+  }
+};
 
 // Global copy function for code blocks
 window.copyCode = function(btn) {

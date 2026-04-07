@@ -1758,6 +1758,80 @@ body {
    Code Blocks — glass panel with frosted header
    ═══════════════════════════════════════════════════════ */
 
+/* Mermaid diagram containers */
+.mermaid-wrapper {
+  margin: 12px 0;
+  padding: 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(12px);
+  overflow-x: auto;
+}
+
+.mermaid-toolbar {
+  display: flex;
+  gap: 6px;
+  padding: 0 0 8px 0;
+  justify-content: flex-end;
+}
+
+.mermaid-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 0.75em;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.mermaid-btn:hover {
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.mermaid-btn.copied {
+  color: #72f1b8;
+  border-color: rgba(114, 241, 184, 0.3);
+}
+
+.mermaid-wrapper .mermaid {
+  display: flex;
+  justify-content: center;
+}
+
+.mermaid-wrapper .mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
+
+:root[data-theme="clean"] .mermaid-wrapper,
+:root[data-theme="terracotta"] .mermaid-wrapper,
+:root[data-theme="sage"] .mermaid-wrapper {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+:root[data-theme="clean"] .mermaid-btn,
+:root[data-theme="terracotta"] .mermaid-btn,
+:root[data-theme="sage"] .mermaid-btn {
+  color: rgba(0, 0, 0, 0.4);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+:root[data-theme="clean"] .mermaid-btn:hover,
+:root[data-theme="terracotta"] .mermaid-btn:hover,
+:root[data-theme="sage"] .mermaid-btn:hover {
+  color: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.04);
+}
+
 .code-block-wrapper {
   position: relative;
   margin: 8px 0;
@@ -3217,6 +3291,57 @@ body.hide-thinking .thinking-block { display: none !important; }
   background: rgba(255, 255, 255, 0.06);
   font-size: 0.82em;
   color: rgba(255, 255, 255, 0.6);
+}
+
+.team-tool-input {
+  position: relative;
+  margin: 4px 0;
+  border-left: 2px solid rgba(54, 249, 246, 0.3);
+  padding-left: 8px;
+}
+
+.team-tool-input pre {
+  margin: 0;
+  padding: 4px 28px 4px 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  overflow-x: auto;
+  font-size: 0.78em;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.team-tool-input code {
+  background: none;
+  padding: 0;
+  border: none;
+  font-size: inherit;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.team-tool-copy {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+}
+
+.team-tool-copy:hover {
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.team-tool-copy.copied {
+  color: #72f1b8;
 }
 
 .team-card-stats {

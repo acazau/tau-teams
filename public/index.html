@@ -204,6 +204,41 @@
   <!-- Dialog Container -->
   <div id="dialog-container" class="hidden"></div>
 
+  <!-- Pako for mermaid.live URL encoding -->
+  <script src="https://cdn.jsdelivr.net/npm/pako@2/dist/pako.min.js"></script>
+  <!-- Mermaid diagram rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'dark',
+      themeVariables: {
+        darkMode: true,
+        background: '#1a1a2e',
+        primaryColor: '#36f9f6',
+        primaryTextColor: '#e0e0e0',
+        primaryBorderColor: '#36f9f6',
+        lineColor: '#72f1b8',
+        secondaryColor: '#ff9e64',
+        tertiaryColor: '#2a2a4a',
+        fontFamily: 'inherit'
+      },
+      flowchart: { curve: 'basis', padding: 16 },
+      sequence: { actorMargin: 50, messageMargin: 40 }
+    });
+
+    // Re-render mermaid diagrams after DOM updates
+    window.renderMermaidDiagrams = async function() {
+      const elements = document.querySelectorAll('.mermaid:not([data-processed])');
+      if (elements.length === 0) return;
+      try {
+        await mermaid.run({ nodes: elements });
+      } catch (e) {
+        console.warn('Mermaid render error:', e);
+      }
+    };
+  </script>
+
   <!-- Scripts -->
   <script type="module" src="app.js"></script>
 </body>

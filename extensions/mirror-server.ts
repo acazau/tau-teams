@@ -15,7 +15,8 @@ import { WebSocketServer, WebSocket } from "ws";
 import * as http from "node:http";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import QRCode from "qrcode";
+let QRCode: any = null;
+try { QRCode = require("qrcode"); } catch { /* qrcode is optional — /qr command will be unavailable */ }
 
 const PORT = parseInt(process.env.TAU_MIRROR_PORT || "3001");
 // @ts-ignore — __dirname is provided by jiti at runtime
@@ -200,12 +201,6 @@ export default function (pi: ExtensionAPI) {
       broadcast({ type: "event", event: { type: eventType, ...event } });
     });
   }
-
-  // ── Forward multi-team-chat worker/lead events to browser clients ──
-  // multi-team-chat emits "team_event" on process when leads/workers act
-  process.on("team_event" as any, (data: any) => {
-    broadcast({ type: "event", event: { type: "team_event", ...data } });
-  });
 
   // Also capture context from session events
   // Auto-title: collect user messages and generate a title after a few turns
@@ -692,9 +687,9 @@ export default function (pi: ExtensionAPI) {
     }
 
     if (urlPath === "/api/qr") {
-      if (!mirrorUrl) {
+      if (!QRCode || !mirrorUrl) {
         res.writeHead(503, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "Server not ready" }));
+        res.end(JSON.stringify({ error: QRCode ? "Server not ready" : "qrcode module not installed — run: npm install qrcode" }));
         return;
       }
       const qrPromises = [QRCode.toDataURL(mirrorUrl, { width: 256, margin: 2 })];
@@ -1020,7 +1015,7 @@ img{border-radius:12px}a{color:#b87a5c;font-size:18px;margin-top:16px}p{color:rg
     "node_modules", ".git", "__pycache__", ".DS_Store", ".Trash",
     ".next", ".nuxt", "dist", "build", ".cache", ".turbo",
     "venv", ".venv", "env", ".env.local",
-    ".pi", "coverage", ".nyc_output", ".parcel-cache",
+    "coverage", ".nyc_output", ".parcel-cache",
   ]);
 
   function serveFileList(res: http.ServerResponse, dirPath: string) {
@@ -1035,7 +1030,6 @@ img{border-radius:12px}a{color:#b87a5c;font-size:18px;margin-top:16px}p{color:rg
       const items: any[] = [];
 
       for (const entry of entries) {
-        if (entry.name.startsWith(".") && entry.name !== ".env") continue;
         if (IGNORED_NAMES.has(entry.name)) continue;
 
         try {
