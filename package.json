@@ -1,0 +1,11 @@
+{
+  "name": "tau-teams",
+  "version": "0.1.0",
+  "description": "Tau extension for Pi multi-team worker visibility — renders lead and worker activity in the browser UI",
+  "main": "extensions/mirror-server.ts",
+  "keywords": ["pi", "tau", "multi-team", "browser-mirror"],
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
